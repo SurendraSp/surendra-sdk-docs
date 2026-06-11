@@ -1,6 +1,6 @@
 # Smart Ads SDK — Firebase Remote Config
 
-The SDK reads two RC keys at startup and re-fetches every hour. All RC values are optional — the SDK falls back to `AdConfig` values, then to built-in defaults if a key is missing or malformed.
+The SDK reads two RC keys at startup and re-fetches every hour. All RC values are optional — the SDK falls back to built-in defaults if a key is missing or malformed.
 
 ---
 
@@ -24,10 +24,13 @@ A JSON array of house-ad objects. Each object maps to one `HouseAdConfig`. The a
   {
     "packageName":  "com.example.otherapp",
     "title":        "My Other App",
+    "titleHi":      "मेरा दूसरा ऐप",
     "subtitle":     "Short tagline shown under the title",
+    "subtitleHi":   "शीर्षक के नीचे दिखाई गई छोटी टैगलाइन",
     "iconUrl":      "https://cdn.example.com/icon.png",
     "playStoreUrl": "https://play.google.com/store/apps/details?id=com.example.otherapp",
-    "ctaText":      "Install Free"
+    "ctaText":      "Install Free",
+    "ctaTextHi":    "मुफ्त इंस्टॉल करें"
   }
 ]
 ```
@@ -37,20 +40,31 @@ A JSON array of house-ad objects. Each object maps to one `HouseAdConfig`. The a
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `packageName` | string | yes | — | Android package name. Used to check if the app is already installed — installed apps are never shown. |
-| `title` | string | yes | — | App name displayed in banner, card, and full-screen. |
-| `subtitle` | string | no | `""` | Short description / tagline. |
+| `title` | string | yes | — | App name displayed in banner, card, and full-screen (English). |
+| `titleHi` | string | no | `""` | App name in Hindi. Empty → falls back to `title`. |
+| `subtitle` | string | no | `""` | Short description / tagline (English). |
+| `subtitleHi` | string | no | `""` | Tagline in Hindi. Empty → falls back to `subtitle`. |
 | `iconUrl` | string | no | `""` | URL of the app icon. Loaded with Coil. Empty string → placeholder tinted with `AdTheme.primary`. |
 | `playStoreUrl` | string | yes | — | Full Play Store URL. Opened via `Intent.ACTION_VIEW` when the user taps the CTA or full-screen background. |
-| `ctaText` | string | no | `"Install"` | Label for the CTA button. |
+| `ctaText` | string | no | `"Install"` | Label for the CTA button (English). |
+| `ctaTextHi` | string | no | `""` | CTA button label in Hindi. Empty → falls back to `ctaText`. |
 
 > `priority` is not set in JSON — it is assigned automatically from the array index during parsing (index 0 → priority 0, highest).
 
-### Priority logic
+### Localization
 
-The `HouseAdEngine` iterates the list from index 0 and returns the first app whose `packageName` is **not installed** on the device:
+The SDK picks the correct language string automatically:
 
-- `nextAd()` — used for banner and interstitial; returns the single highest-priority eligible ad.
-- `buildEligibleQueue()` — used for in-feed content ads; returns all eligible ads in priority order. The orchestrator cycles through this queue round-robin across content list injection points.
+1. App-level locale set via `AppCompatDelegate.setApplicationLocales` (takes priority)
+2. Device system language
+3. English fallback if no Hindi translation is provided
+
+### Priority and round-robin logic
+
+The `HouseAdEngine` filters out already-installed apps, then:
+
+- `nextAd()` — used for **banner and interstitial**; cycles round-robin through all eligible apps. Each call returns the next app in sequence, so impressions rotate across all uninstalled apps.
+- `buildEligibleQueue()` — used for **in-feed content ads**; returns all eligible apps in priority order. The orchestrator cycles through this queue across content list injection points.
 
 If every app in `house_ads` is already installed, no house ads are shown for any slot.
 
@@ -59,20 +73,26 @@ If every app in `house_ads` is already installed, no house ads are shown for any
 ```json
 [
   {
-    "packageName":  "com.socialtool.videosaver",
-    "title":        "Video Saver Pro",
-    "subtitle":     "Download any video in seconds",
-    "iconUrl":      "https://example.com/icons/videosaver.png",
-    "playStoreUrl": "https://play.google.com/store/apps/details?id=com.socialtool.videosaver",
-    "ctaText":      "Install Free"
+    "packageName":  "com.parihartrick.socialtool",
+    "title":        "WhatsSmart - WA Status Saver",
+    "titleHi":      "WhatsSmart - स्टेटस सेवर",
+    "subtitle":     "Save WhatsApp status, stylish text & more",
+    "subtitleHi":   "स्टेटस सेव करें, स्टाइलिश टेक्स्ट और बहुत कुछ",
+    "iconUrl":      "https://play-lh.googleusercontent.com/nAmK957nWiHYe6R_7Fah7Eby5QwOLnliamufA1cRryMqlq6FlY77BhuJxl_hGvchfg=w240-h480",
+    "playStoreUrl": "https://play.google.com/store/apps/details?id=com.parihartrick.socialtool",
+    "ctaText":      "Install Free",
+    "ctaTextHi":    "मुफ्त इंस्टॉल करें"
   },
   {
-    "packageName":  "com.socialtool.statussaver",
-    "title":        "Status Saver",
-    "subtitle":     "Save WhatsApp statuses in one tap",
-    "iconUrl":      "https://example.com/icons/statussaver.png",
-    "playStoreUrl": "https://play.google.com/store/apps/details?id=com.socialtool.statussaver",
-    "ctaText":      "Install"
+    "packageName":  "com.panchang.jyotish",
+    "title":        "Jyotish - Daily Rashifal",
+    "titleHi":      "ज्योतिष - दैनिक राशिफल",
+    "subtitle":     "Daily horoscope & Vedic astrology",
+    "subtitleHi":   "दैनिक राशिफल और वैदिक ज्योतिष",
+    "iconUrl":      "https://play-lh.googleusercontent.com/ek-sLMrZsbTz2SdLXZQY--M-i1kWArPoM79BjiV5zOF7Bg1HgbdwtpE1USRRJFu3gQpX_RPh2GZZ6M1iF_wtMw=w240-h480",
+    "playStoreUrl": "https://play.google.com/store/apps/details?id=com.panchang.jyotish",
+    "ctaText":      "Install Free",
+    "ctaTextHi":    "मुफ्त इंस्टॉल करें"
   }
 ]
 ```
@@ -81,7 +101,7 @@ If every app in `house_ads` is already installed, no house ads are shown for any
 
 ## `ads_cadence_config`
 
-A JSON object that overrides the cadence and timing values set in `AdConfig`. All fields are optional — omitted fields keep the `AdConfig` values.
+A JSON object that overrides cadence and timing values. All fields are optional — omitted fields use the SDK built-in defaults.
 
 ### Schema
 
@@ -97,13 +117,13 @@ A JSON object that overrides the cadence and timing values set in `AdConfig`. Al
 
 ### Field reference
 
-| Field | Type | Corresponding `AdConfig` field | Description |
-|-------|------|-------------------------------|-------------|
-| `interstitialCloseSec` | int | `interstitialCloseDurationSec` | Seconds before the close button appears on the house-ad full-screen interstitial. Drives the countdown ring animation. |
-| `bannerHouseCadence` | int | `bannerHouseCadence` | House-ad cadence for the banner slot. |
-| `interstitialHouseCadence` | int | `interstitialHouseCadence` | House-ad cadence for the interstitial slot. |
-| `contentAdInterval` | int | `contentAdInterval` | House-ad injection interval for `buildAdList()`. |
-| `interstitialTriggerThreshold` | int | `interstitialTriggerThreshold` | How many `onActionCompleted()` calls before an interstitial is triggered. |
+| Field | Type | SDK default | Description |
+|-------|------|-------------|-------------|
+| `interstitialCloseSec` | int | `5` | Seconds before the close button appears on the house-ad full-screen interstitial. Drives the countdown ring animation. |
+| `bannerHouseCadence` | int | `50` | House-ad cadence for the banner slot. |
+| `interstitialHouseCadence` | int | `10` | House-ad cadence for the interstitial slot. |
+| `contentAdInterval` | int | `4` | House-ad injection interval for `buildAdList()`. |
+| `interstitialTriggerThreshold` | int | `3` | How many `onActionCompleted()` calls before an interstitial is triggered. |
 
 ### Cadence semantics
 
@@ -113,13 +133,7 @@ A JSON object that overrides the cadence and timing values set in `AdConfig`. Al
 | `0` | Always show house ad. FAN is never used for this slot. |
 | `N > 0` | Show 1 house ad after every N FAN impressions for this slot. |
 
-**Value priority (highest → lowest):**
-
-1. `ads_cadence_config` RC value (applied live after fetch)
-2. `AdConfig` constructor value
-3. SDK built-in default
-
-RC values are read live — cadence changes take effect on the next impression after the fetch completes, without requiring an app restart.
+RC values are read live — changes take effect on the next impression after the fetch completes, without an app restart.
 
 ### Full sample
 
@@ -134,7 +148,7 @@ RC values are read live — cadence changes take effect on the next impression a
 ```
 
 This config would:
-- Show the close button on full-screen interstitials after 8 seconds (overriding the default 5).
+- Show the close button on full-screen interstitials after 8 seconds.
 - Show a house banner every 30th FAN banner impression.
 - Show a house interstitial every 5th FAN interstitial.
 - Inject a content ad card every 6 real items.
@@ -151,4 +165,4 @@ val settings = remoteConfigSettings { minimumFetchIntervalInSeconds = 0 }
 Firebase.remoteConfig.setConfigSettingsAsync(settings)
 ```
 
-The SDK calls `fetchAndActivate()` on its own; you do not need to call it separately.
+The SDK calls `fetch()` + `activate()` on its own; you do not need to call it separately.

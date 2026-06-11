@@ -1,6 +1,6 @@
 # Smart Ads SDK — Getting Started
 
-**Maven:** `com.github.SurendraSp:smart-ads:1.0.2`  
+**Maven:** `com.github.SurendraSp:smart-ads:1.0.3`  
 **Registry:** `https://maven.pkg.github.com/SurendraSp/SmartAdsSDK`  
 **Namespace:** `io.surendrasp.ads`
 
@@ -91,7 +91,7 @@ In your app's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.github.SurendraSp:smart-ads:1.0.2")
+    implementation("com.github.SurendraSp:smart-ads:1.0.3")
 
     // Required peer dependencies — the SDK declares these compileOnly to avoid version conflicts
     implementation("io.coil-kt:coil-compose:2.7.0")
@@ -122,16 +122,8 @@ class MyApp : Application() {
             context = applicationContext,
             config  = AdConfig(
                 // FAN placement IDs from Meta Business Manager
-                fanBannerPlacementId          = "YOUR_BANNER_PLACEMENT_ID",
-                fanInterstitialPlacementId    = "YOUR_INTERSTITIAL_PLACEMENT_ID",
-
-                // Cadence: how often to show a house ad vs FAN ad
-                // -1 = never, 0 = always, N = 1 house ad every N FAN impressions
-                bannerHouseCadence            = 50,   // show house banner every 50th FAN banner
-                interstitialHouseCadence      = 10,   // show house interstitial every 10th FAN interstitial
-                contentAdInterval             = 4,    // inject 1 house card per 4 real content items
-                interstitialTriggerThreshold  = 3,    // fire interstitial after every 3 qualifying actions
-                interstitialCloseDurationSec  = 5,    // seconds before close button appears
+                fanBannerPlacementId       = "YOUR_BANNER_PLACEMENT_ID",
+                fanInterstitialPlacementId = "YOUR_INTERSTITIAL_PLACEMENT_ID",
 
                 analytics    = FirebaseAnalytics.getInstance(this),
                 remoteConfig = Firebase.remoteConfig,
@@ -150,6 +142,8 @@ class MyApp : Application() {
     }
 }
 ```
+
+> **Cadence and timing** (how often ads show, how long the close countdown is) are controlled via Firebase Remote Config key `ads_cadence_config` — no code changes needed to tune them. See [Remote Config](remote-config.md) for the full schema and SDK built-in defaults.
 
 Register `MyApp` in `AndroidManifest.xml`:
 
@@ -204,7 +198,7 @@ Button(onClick = {
 }
 ```
 
-An interstitial fires after every `interstitialTriggerThreshold` calls (default: 3).
+An interstitial fires after every `interstitialTriggerThreshold` calls (RC default: 3).
 
 ### Content / In-feed ads
 
@@ -232,18 +226,13 @@ fun GalleryScreen(viewModel: GalleryViewModel) {
 
 ## 5. AdConfig parameter reference
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `fanBannerPlacementId` | `String` | required | FAN banner placement ID |
-| `fanInterstitialPlacementId` | `String` | required | FAN interstitial placement ID |
-| `bannerHouseCadence` | `Int` | `50` | House-ad cadence for banner slot |
-| `interstitialHouseCadence` | `Int` | `10` | House-ad cadence for interstitial slot |
-| `contentAdInterval` | `Int` | `4` | Inject 1 house ad per N real content items |
-| `interstitialTriggerThreshold` | `Int` | `3` | Actions before interstitial fires |
-| `interstitialCloseDurationSec` | `Int` | `5` | Seconds before close button appears |
-| `analytics` | `FirebaseAnalytics` | required | Host app's Firebase Analytics instance |
-| `remoteConfig` | `FirebaseRemoteConfig` | required | Host app's Firebase Remote Config instance |
-| `appPackageId` | `String` | required | Host app package name (tagged on all events) |
-| `theme` | `AdTheme` | `AdTheme()` | Optional brand theming; see [Theming](theming.md) |
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `fanBannerPlacementId` | `String` | FAN banner placement ID |
+| `fanInterstitialPlacementId` | `String` | FAN interstitial placement ID |
+| `analytics` | `FirebaseAnalytics` | Host app's Firebase Analytics instance |
+| `remoteConfig` | `FirebaseRemoteConfig` | Host app's Firebase Remote Config instance |
+| `appPackageId` | `String` | Host app package name (tagged on all events) |
+| `theme` | `AdTheme` | Optional brand theming; see [Theming](theming.md) |
 
-Cadence values are overridable at runtime via Firebase Remote Config — see [Remote Config](remote-config.md).
+All cadence and timing values are controlled via RC — see [Remote Config](remote-config.md).

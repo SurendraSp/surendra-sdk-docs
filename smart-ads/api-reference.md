@@ -40,7 +40,7 @@ Internally:
 fun onActionCompleted(context: Context)
 ```
 
-Signal that the user completed a qualifying action (save, download, share, export, etc.). The SDK increments an internal counter and triggers an interstitial after every `interstitialTriggerThreshold` calls.
+Signal that the user completed a qualifying action (save, download, share, export, etc.). The SDK increments an internal counter and triggers an interstitial after every `interstitialTriggerThreshold` calls (default: 3, overridable via RC).
 
 **Decision tree when threshold is reached:**
 1. If it's the house-ad interstitial turn AND a house ad is eligible → show house-ad full screen, preload FAN for next time.
@@ -58,7 +58,7 @@ Counter resets to zero each time the threshold is hit.
 fun <T> buildAdList(items: List<T>, context: Context): List<AdListItem<T>>
 ```
 
-Builds a mixed list with house-ad placeholders injected at the configured `contentAdInterval`.
+Builds a mixed list with house-ad placeholders injected at the configured `contentAdInterval` (default: 4, overridable via RC).
 
 | `contentAdInterval` | Behaviour |
 |---------------------|-----------|
@@ -78,7 +78,7 @@ Returns `List<AdListItem<T>>` — see [AdListItem](#adlistitem) below.
 fun nextHouseAd(context: Context): HouseAdConfig?
 ```
 
-Returns the highest-priority house ad whose app is not yet installed, or `null` if all apps are installed. Used internally by `AdBannerSlot`; call directly only if building fully custom UI.
+Returns the next house ad in round-robin order among uninstalled apps, or `null` if all apps are installed. Used internally by `AdBannerSlot`; call directly only if building fully custom UI.
 
 ---
 
@@ -110,7 +110,7 @@ Emits a `HouseAdConfig` each time the orchestrator decides a house-ad interstiti
 val interstitialCloseDurationSec: StateFlow<Int>
 ```
 
-The number of seconds before the close button appears on the house-ad full-screen. Starts at the value from `AdConfig.interstitialCloseDurationSec`; updated live when Firebase Remote Config fetch completes (`ads_cadence_config.interstitialCloseSec`).
+Seconds before the close button appears on the house-ad full-screen. Starts at the SDK default (5); updated live when Firebase Remote Config fetch completes (`ads_cadence_config.interstitialCloseSec`).
 
 ---
 
@@ -128,33 +128,25 @@ The `AdTheme` passed in `AdConfig`. Available after `init()`. Used by the SDK's 
 
 ```kotlin
 data class AdConfig(
-    val fanBannerPlacementId:         String,
-    val fanInterstitialPlacementId:   String,
-    val bannerHouseCadence:           Int      = 50,
-    val interstitialHouseCadence:     Int      = 10,
-    val contentAdInterval:            Int      = 4,
-    val interstitialTriggerThreshold: Int      = 3,
-    val interstitialCloseDurationSec: Int      = 5,
-    val analytics:                    FirebaseAnalytics,
-    val remoteConfig:                 FirebaseRemoteConfig,
-    val appPackageId:                 String,
-    val theme:                        AdTheme  = AdTheme(),
+    val fanBannerPlacementId:        String,
+    val fanInterstitialPlacementId:  String,
+    val analytics:                   FirebaseAnalytics,
+    val remoteConfig:                FirebaseRemoteConfig,
+    val appPackageId:                String,
+    val theme:                       AdTheme = AdTheme(),
 )
 ```
 
-### Cadence semantics
+All cadence and timing values are controlled via Firebase Remote Config key `ads_cadence_config`. See [Remote Config](remote-config.md) for the full schema and SDK built-in defaults.
 
-| Value | Meaning |
-|-------|---------|
-| `-1` | Never show house ad for this slot |
-| `0` | Always show house ad (FAN is never used for this slot) |
-| `N > 0` | Show 1 house ad after every N FAN impressions |
-
-### Value priority (highest → lowest)
-
-1. `ads_cadence_config` Firebase Remote Config key (live, fetched at runtime)
-2. Values provided in `AdConfig` constructor
-3. SDK built-in defaults
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `fanBannerPlacementId` | `String` | FAN banner placement ID |
+| `fanInterstitialPlacementId` | `String` | FAN interstitial placement ID |
+| `analytics` | `FirebaseAnalytics` | Host app's Firebase Analytics instance |
+| `remoteConfig` | `FirebaseRemoteConfig` | Host app's Firebase Remote Config instance |
+| `appPackageId` | `String` | Host app package name (tagged on all analytics events) |
+| `theme` | `AdTheme` | Optional brand theming; see [Theming](theming.md) |
 
 ---
 
@@ -196,10 +188,13 @@ See [Theming](theming.md) for full details and examples.
 data class HouseAdConfig(
     val packageName:  String,
     val title:        String,
+    val titleHi:      String = "",
     val subtitle:     String = "",
+    val subtitleHi:   String = "",
     val iconUrl:      String = "",
     val playStoreUrl: String,
     val ctaText:      String = "Install",
+    val ctaTextHi:    String = "",
     val priority:     Int    = 0,
 )
 ```
@@ -209,12 +204,23 @@ Deserialized from the `house_ads` Firebase Remote Config key. Passed to slot com
 | Field | Description |
 |-------|-------------|
 | `packageName` | Android package name — used for installed-app check |
-| `title` | App name shown in the ad |
-| `subtitle` | Short tagline |
+| `title` | App name (English) |
+| `titleHi` | App name (Hindi). Empty → falls back to `title` |
+| `subtitle` | Short tagline (English) |
+| `subtitleHi` | Short tagline (Hindi). Empty → falls back to `subtitle` |
 | `iconUrl` | App icon URL; empty string → placeholder shown |
 | `playStoreUrl` | Full Play Store URL opened by the CTA button |
-| `ctaText` | CTA button label (default `"Install"`) |
+| `ctaText` | CTA button label (English, default `"Install"`) |
+| `ctaTextHi` | CTA button label (Hindi). Empty → falls back to `ctaText` |
 | `priority` | Lower = shown first; assigned from JSON array index during parse |
+
+### Locale resolution
+
+Call `resolvedTitle(context)`, `resolvedSubtitle(context)`, `resolvedCtaText(context)` to get the correct string for the current locale. Resolution order:
+
+1. App-level locale set via `AppCompatDelegate.setApplicationLocales`
+2. Device system language
+3. English fallback
 
 ---
 
@@ -347,8 +353,7 @@ SDK default full-screen interstitial overlay. Dark semi-transparent background (
 - If app goes to background while visible → fires `interstitial_app_drop`; does not call `onDismiss` (ad stays ready when user returns).
 - On `ON_RESUME` after background → calls `onDismiss` to cleanly remove the ad.
 - Visible seconds are tracked and reported in all interstitial analytics events.
-
-CTA button and the background scrim are both tappable and open `config.playStoreUrl`.
+- Tapping anywhere on the screen (outside the close button area) fires the CTA and opens the Play Store.
 
 ---
 
