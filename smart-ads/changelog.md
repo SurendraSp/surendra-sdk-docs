@@ -1,5 +1,15 @@
 # Smart Ads SDK — Changelog
 
+## 1.0.4
+
+### Bug fixes
+
+- **Banner cadence `0` now correctly stays on house ads** — when `bannerHouseCadence` is `0` (always show house), a FAN banner load no longer counts as an impression or resets the slot back to FAN. The slot stays on the house ad as long as an eligible app exists. If all apps are installed, it falls back to FAN with a `house_ad_skipped` event.
+- **House banner shown with cadence `0` no longer resets to FAN** — `onHouseBannerShown` now keeps `showFanBanner = false` when cadence is `0`, so consecutive impressions stay on house ads.
+- **`contentAdInterval = 0` is now treated as disabled** — previously `0` was a valid "always inject" value; it now behaves the same as `-1` (no content ads). Only `N > 0` enables injection.
+
+---
+
 ## 1.0.3
 
 ### Breaking changes

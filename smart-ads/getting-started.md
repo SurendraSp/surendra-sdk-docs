@@ -1,6 +1,6 @@
 # Smart Ads SDK — Getting Started
 
-**Maven:** `com.github.SurendraSp:smart-ads:1.0.3`  
+**Maven:** `com.github.SurendraSp:smart-ads:1.0.4`  
 **Registry:** `https://maven.pkg.github.com/SurendraSp/SmartAdsSDK`  
 **Namespace:** `io.surendrasp.ads`
 
@@ -91,7 +91,7 @@ In your app's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.github.SurendraSp:smart-ads:1.0.3")
+    implementation("com.github.SurendraSp:smart-ads:1.0.4")
 
     // Required peer dependencies — the SDK declares these compileOnly to avoid version conflicts
     implementation("io.coil-kt:coil-compose:2.7.0")

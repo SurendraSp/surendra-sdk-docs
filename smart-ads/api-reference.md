@@ -62,8 +62,7 @@ Builds a mixed list with house-ad placeholders injected at the configured `conte
 
 | `contentAdInterval` | Behaviour |
 |---------------------|-----------|
-| `-1` | Returns `items` unchanged — no ads injected |
-| `0` | All slots are house ads |
+| `-1` or `0` | Returns `items` unchanged — no ads injected |
 | `N > 0` | 1 house ad after every N real items |
 
 The eligible house-ad queue is built from currently uninstalled apps, in priority order. If the queue is exhausted before all injection points are filled, remaining slots are silently skipped (no gap in the list).
@@ -214,13 +213,19 @@ Deserialized from the `house_ads` Firebase Remote Config key. Passed to slot com
 | `ctaTextHi` | CTA button label (Hindi). Empty → falls back to `ctaText` |
 | `priority` | Lower = shown first; assigned from JSON array index during parse |
 
-### Locale resolution
+### Locale resolution methods
 
-Call `resolvedTitle(context)`, `resolvedSubtitle(context)`, `resolvedCtaText(context)` to get the correct string for the current locale. Resolution order:
+```kotlin
+fun resolvedTitle(context: Context): String
+fun resolvedSubtitle(context: Context): String
+fun resolvedCtaText(context: Context): String
+```
+
+Call these instead of accessing `title`, `subtitle`, `ctaText` directly when rendering ad UI. Each method returns the Hindi string when the device/app locale is `hi`, or falls back to the English field. Resolution order:
 
 1. App-level locale set via `AppCompatDelegate.setApplicationLocales`
-2. Device system language
-3. English fallback
+2. Device system language (`Locale.getDefault().language`)
+3. English fallback (the base field)
 
 ---
 

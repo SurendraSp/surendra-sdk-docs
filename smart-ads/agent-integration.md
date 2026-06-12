@@ -9,10 +9,10 @@ This document is a self-contained reference for AI agents integrating the Smart 
 | | |
 |---|---|
 | **Library** | Smart Ads SDK |
-| **Maven coordinate** | `com.github.SurendraSp:smart-ads:1.0.2` |
+| **Maven coordinate** | `com.github.SurendraSp:smart-ads:1.0.4` |
 | **GitHub Packages URL** | `https://maven.pkg.github.com/SurendraSp/SmartAdsSDK` |
 | **Root package** | `io.surendrasp.ads` |
-| **Current version** | `1.0.2` |
+| **Current version** | `1.0.4` |
 | **minSdk** | 26 |
 | **compileSdk** | 37 |
 | **Kotlin** | 2.x |
@@ -65,7 +65,7 @@ In the app module's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.github.SurendraSp:smart-ads:1.0.2")
+    implementation("com.github.SurendraSp:smart-ads:1.0.4")
 
     // Required peer dependencies
     implementation("io.coil-kt:coil-compose:2.7.0")                            // image loading
@@ -91,13 +91,8 @@ class MyApp : Application() {
         AdsSDK.init(
             context = applicationContext,
             config  = AdConfig(
-                fanBannerPlacementId         = "YOUR_FAN_BANNER_PLACEMENT_ID",
-                fanInterstitialPlacementId   = "YOUR_FAN_INTERSTITIAL_PLACEMENT_ID",
-                bannerHouseCadence           = 50,
-                interstitialHouseCadence     = 10,
-                contentAdInterval            = 4,
-                interstitialTriggerThreshold = 3,
-                interstitialCloseDurationSec = 5,
+                fanBannerPlacementId       = "YOUR_FAN_BANNER_PLACEMENT_ID",
+                fanInterstitialPlacementId = "YOUR_FAN_INTERSTITIAL_PLACEMENT_ID",
                 analytics    = FirebaseAnalytics.getInstance(this),
                 remoteConfig = Firebase.remoteConfig,
                 appPackageId = BuildConfig.APPLICATION_ID,
@@ -109,6 +104,9 @@ class MyApp : Application() {
         )
     }
 }
+```
+
+> Cadence and timing values (`bannerHouseCadence`, `interstitialHouseCadence`, `contentAdInterval`, `interstitialTriggerThreshold`, `interstitialCloseDurationSec`) are controlled exclusively via the `ads_cadence_config` Firebase Remote Config key. SDK built-in defaults apply when RC has no value. See the RC keys section below.
 ```
 
 Register in `AndroidManifest.xml`:
@@ -214,7 +212,7 @@ object AdsSDK {
 | `init(context, config)` | Initialize. Call once in `Application.onCreate()`. Idempotent. |
 | `onActionCompleted(context)` | Increment action counter; trigger interstitial at threshold. |
 | `buildAdList(items, context)` | Return mixed list with house-ad placeholders injected every `contentAdInterval` items. |
-| `nextHouseAd(context)` | Highest-priority uninstalled house ad, or `null`. |
+| `nextHouseAd(context)` | Next uninstalled house ad in round-robin rotation, or `null` if all installed. |
 | `showFanBanner` | `true` when FAN banner should show. Managed internally by `AdBannerSlot`. |
 | `showHouseAdFullScreen` | Emits `HouseAdConfig` when a full-screen interstitial should show. Consumed by `HouseAdFullScreenHost`. |
 | `interstitialCloseDurationSec` | Live close-button delay in seconds. Updated from RC after fetch. |
@@ -226,29 +224,32 @@ object AdsSDK {
 
 ```kotlin
 data class AdConfig(
-    val fanBannerPlacementId:         String,           // required
-    val fanInterstitialPlacementId:   String,           // required
-    val bannerHouseCadence:           Int      = 50,
-    val interstitialHouseCadence:     Int      = 10,
-    val contentAdInterval:            Int      = 4,
-    val interstitialTriggerThreshold: Int      = 3,
-    val interstitialCloseDurationSec: Int      = 5,
-    val analytics:                    FirebaseAnalytics,  // required
-    val remoteConfig:                 FirebaseRemoteConfig, // required
-    val appPackageId:                 String,           // required — use BuildConfig.APPLICATION_ID
-    val theme:                        AdTheme  = AdTheme(),
+    val fanBannerPlacementId:        String,                // required
+    val fanInterstitialPlacementId:  String,                // required
+    val analytics:                   FirebaseAnalytics,     // required
+    val remoteConfig:                FirebaseRemoteConfig,  // required
+    val appPackageId:                String,                // required — use BuildConfig.APPLICATION_ID
+    val theme:                       AdTheme = AdTheme(),
 )
 ```
 
-**Cadence semantics (applies to `bannerHouseCadence`, `interstitialHouseCadence`, `contentAdInterval`):**
+All cadence and timing values (`bannerHouseCadence`, `interstitialHouseCadence`, `contentAdInterval`, `interstitialTriggerThreshold`, `interstitialCloseDurationSec`) are configured via the `ads_cadence_config` Firebase Remote Config key. SDK built-in defaults:
 
-| Value | Meaning |
-|-------|---------|
-| `-1` | House ads disabled for this slot (FAN only) |
-| `0` | Always show house ad; FAN never used for this slot |
-| `N > 0` | 1 house ad per N FAN impressions |
+| Setting | Default |
+|---------|---------|
+| `bannerHouseCadence` | 50 |
+| `interstitialHouseCadence` | 10 |
+| `contentAdInterval` | 4 |
+| `interstitialTriggerThreshold` | 3 |
+| `interstitialCloseSec` | 5 |
 
-All cadence values are overridable at runtime via `ads_cadence_config` RC key.
+**Cadence semantics:**
+
+| Value | Banner / Interstitial behaviour | Content-ad behaviour |
+|-------|---------------------------------|----------------------|
+| `-1` | House ads disabled; FAN only | No ads injected |
+| `0` | Always show house ad; FAN never used | No ads injected (treated same as `-1`) |
+| `N > 0` | 1 house ad per N FAN impressions | 1 house ad per N content items |
 
 ---
 
@@ -287,15 +288,29 @@ data class AdTheme(
 data class HouseAdConfig(
     val packageName:  String,
     val title:        String,
+    val titleHi:      String = "",
     val subtitle:     String = "",
+    val subtitleHi:   String = "",
     val iconUrl:      String = "",
     val playStoreUrl: String,
     val ctaText:      String = "Install",
+    val ctaTextHi:    String = "",
     val priority:     Int    = 0,
-)
+) {
+    fun resolvedTitle(context: Context): String
+    fun resolvedSubtitle(context: Context): String
+    fun resolvedCtaText(context: Context): String
+}
 ```
 
 Deserialized from the `house_ads` RC key. Passed to slot composables and `AdListItem.HouseAd`. `priority` is assigned from the JSON array index (index 0 = highest priority = shown first).
+
+**Always call `resolved*` methods when rendering text** — they return the Hindi string automatically when the device/app locale is `hi`, falling back to the English field. Do not access `title`, `subtitle`, or `ctaText` directly in custom UI.
+
+Locale resolution order:
+1. App-level locale set via `AppCompatDelegate.setApplicationLocales`
+2. Device system language (`Locale.getDefault().language`)
+3. English fallback
 
 ---
 
@@ -406,21 +421,26 @@ JSON array. List of cross-sell apps to promote.
   {
     "packageName":  "com.example.otherapp",
     "title":        "My Other App",
+    "titleHi":      "मेरा दूसरा ऐप",
     "subtitle":     "A great tool for everyone",
+    "subtitleHi":   "सबके लिए एक बेहतरीन टूल",
     "iconUrl":      "https://example.com/icon.png",
     "playStoreUrl": "https://play.google.com/store/apps/details?id=com.example.otherapp",
-    "ctaText":      "Install Free"
+    "ctaText":      "Install Free",
+    "ctaTextHi":    "मुफ्त इंस्टॉल करें"
   }
 ]
 ```
 
-Required fields: `packageName`, `title`, `playStoreUrl`. All others are optional.
+Required fields: `packageName`, `title`, `playStoreUrl`. All Hindi fields (`titleHi`, `subtitleHi`, `ctaTextHi`) are optional — omit them to show English only.
 
 Apps that are already installed on the device are automatically skipped — the SDK checks `PackageManager` per call.
 
+Banner and interstitial slots cycle through all eligible apps in **round-robin** order (not always highest-priority). Each call to `nextHouseAd()` / `nextAd()` advances the internal index and wraps around.
+
 ### `ads_cadence_config`
 
-JSON object. All fields optional. Overrides `AdConfig` values at runtime.
+JSON object. All fields optional. Overrides SDK built-in defaults at runtime.
 
 ```json
 {
@@ -432,13 +452,13 @@ JSON object. All fields optional. Overrides `AdConfig` values at runtime.
 }
 ```
 
-| Field | Maps to `AdConfig` field | Notes |
-|-------|--------------------------|-------|
-| `interstitialCloseSec` | `interstitialCloseDurationSec` | Drives countdown ring; exposed as `AdsSDK.interstitialCloseDurationSec` |
-| `bannerHouseCadence` | `bannerHouseCadence` | |
-| `interstitialHouseCadence` | `interstitialHouseCadence` | |
-| `contentAdInterval` | `contentAdInterval` | |
-| `interstitialTriggerThreshold` | `interstitialTriggerThreshold` | |
+| Field | SDK default | Description |
+|-------|-------------|-------------|
+| `interstitialCloseSec` | `5` | Seconds before close button appears; drives countdown ring; exposed as `AdsSDK.interstitialCloseDurationSec` |
+| `bannerHouseCadence` | `50` | House-ad cadence for banner slot |
+| `interstitialHouseCadence` | `10` | House-ad cadence for interstitial slot |
+| `contentAdInterval` | `4` | Inject 1 house-ad card per N real content items |
+| `interstitialTriggerThreshold` | `3` | `onActionCompleted()` calls before an interstitial fires |
 
 Changes take effect on the next impression after RC fetch completes (no restart required).
 
@@ -470,7 +490,9 @@ All three ad surfaces accept a composable slot for fully custom UI. The SDK reta
 ```kotlin
 AdBannerSlot(
     houseAdContent = { config: HouseAdConfig ->
-        // Your composable. config has: title, subtitle, iconUrl, ctaText, playStoreUrl, packageName
+        // Use config.resolvedTitle(context), config.resolvedSubtitle(context),
+        // config.resolvedCtaText(context) for locale-aware strings.
+        // config also has: iconUrl, playStoreUrl, packageName
         // Recommended height: 50.dp to match FAN banner
         MyBannerView(config)
     }
@@ -518,12 +540,17 @@ When `AdsSDK.onActionCompleted(context)` is called:
 
 `AdBannerSlot` observes `AdsSDK.showFanBanner` (a `StateFlow<Boolean>`):
 
-- Starts `true` if `bannerHouseCadence != 0`.
-- When FAN banner fails to load:
-  - If `bannerHouseCadence == -1` → nothing shown.
+- Starts `true` by default.
+- **When FAN banner loads successfully:**
+  - If `bannerHouseCadence == 0` (always house) → check for eligible house ad; if found, set `showFanBanner = false`; if none, stay on FAN.
+  - Otherwise → count the impression; if it's the house-ad turn, switch to house banner.
+- **When FAN banner fails to load:**
+  - If `bannerHouseCadence == -1` → show nothing.
   - Else if house ad available → switch to house banner.
   - Else → hide banner entirely (`showFanBanner = false`).
-- When house banner is shown → reset `showFanBanner = true` so FAN tries next time.
+- **When house banner is shown:**
+  - If `bannerHouseCadence == 0` → stay on house banner (don't reset to FAN).
+  - Otherwise → reset `showFanBanner = true` so FAN tries again next time.
 
 ---
 
@@ -531,11 +558,11 @@ When `AdsSDK.onActionCompleted(context)` is called:
 
 `AdsSDK.buildAdList(items, context)` works as follows:
 
-- If `contentAdInterval == -1` or `items` is empty → return `items` unchanged as `AdListItem.Content`.
+- If `contentAdInterval <= 0` (i.e., `-1` or `0`) or `items` is empty → return `items` unchanged as `AdListItem.Content`. Note: `0` is treated as disabled, not "always inject".
 - Build eligible queue: all uninstalled apps in priority order.
 - If queue is empty → return `items` unchanged.
 - Iterate `items`; after every `contentAdInterval` items, pop one ad from the queue and append `AdListItem.HouseAd`.
-- When queue is exhausted, remaining injection points are silently skipped.
+- When queue is exhausted, remaining injection points are silently skipped (no gap).
 
 ---
 
@@ -555,7 +582,7 @@ Use this checklist to verify a complete integration:
 
 ### Repository & dependency setup
 - [ ] `settings.gradle.kts` has the `SmartAdsSDK` Maven repository block with credential providers
-- [ ] `build.gradle.kts` has `implementation("com.github.SurendraSp:smart-ads:1.0.2")`
+- [ ] `build.gradle.kts` has `implementation("com.github.SurendraSp:smart-ads:1.0.4")`
 - [ ] `build.gradle.kts` has `io.coil-kt:coil-compose:2.x`
 - [ ] `build.gradle.kts` has Firebase BOM + `firebase-analytics` + `firebase-config`
 - [ ] `com.facebook.android:audience-network-sdk` is **not** added manually (it's bundled)
@@ -591,7 +618,7 @@ Use this checklist to verify a complete integration:
 ### Firebase Remote Config
 - [ ] `house_ads` RC key configured with a JSON array of at least one house ad
 - [ ] Each house-ad entry has `packageName`, `title`, `playStoreUrl`
-- [ ] `ads_cadence_config` RC key configured (or left absent to use `AdConfig` defaults)
+- [ ] `ads_cadence_config` RC key configured (or left absent to use SDK built-in defaults)
 - [ ] RC minimum fetch interval set to 0 for debug builds (optional but recommended for testing)
 
 ### Theming (optional)

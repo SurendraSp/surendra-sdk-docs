@@ -127,11 +127,13 @@ A JSON object that overrides cadence and timing values. All fields are optional 
 
 ### Cadence semantics
 
-| Value | Slot behaviour |
-|-------|---------------|
-| `-1` | House ads disabled for this slot. FAN-only; nothing shown if FAN fails. |
-| `0` | Always show house ad. FAN is never used for this slot. |
-| `N > 0` | Show 1 house ad after every N FAN impressions for this slot. |
+| Field | Value | Behaviour |
+|-------|-------|-----------|
+| `bannerHouseCadence` / `interstitialHouseCadence` | `-1` | House ads disabled. FAN-only; nothing shown if FAN fails. |
+| `bannerHouseCadence` / `interstitialHouseCadence` | `0` | Always show house ad. FAN is never used for this slot. |
+| `bannerHouseCadence` / `interstitialHouseCadence` | `N > 0` | Show 1 house ad after every N FAN impressions. |
+| `contentAdInterval` | `-1` or `0` | No content ads injected. List returned as-is. |
+| `contentAdInterval` | `N > 0` | Inject 1 house-ad card after every N real content items. |
 
 RC values are read live — changes take effect on the next impression after the fetch completes, without an app restart.
 
