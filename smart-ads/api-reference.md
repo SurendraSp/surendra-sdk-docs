@@ -1,6 +1,6 @@
 # Smart Ads SDK — API Reference
 
-All public symbols in `io.surendrasp.ads`. Internal classes (`AdOrchestrator`, `AdCounters`, `HouseAdEngine`, `HouseAdRepository`, `FanBannerManager`, `FanInterstitialManager`) are not part of the public API.
+All public symbols in `io.surendrasp.ads`. Internal classes (`AdOrchestrator`, `AdCounters`, `HouseAdEngine`, `HouseAdRepository`, `FanBannerManager`, `FanInterstitialManager`, `UserLifecycle`, `CadenceResolver`) are not part of the public API.
 
 ---
 
@@ -24,8 +24,10 @@ Initializes the SDK. Must be called once in `Application.onCreate()` before any 
 
 Internally:
 - Initializes Facebook Audience Network on a background IO thread (avoids ~50 ms startup cost on main thread).
-- Builds the internal `AdOrchestrator`, `HouseAdEngine`, `HouseAdRepository`, `FanBannerManager`, and `FanInterstitialManager`.
+- Builds the internal `AdOrchestrator`, `HouseAdEngine`, `HouseAdRepository`, `FanBannerManager`, `FanInterstitialManager`, and `UserLifecycle`.
 - Starts a Firebase Remote Config fetch (1-hour interval).
+- Counts this init as a session start (debounced — see `sessionDebounceMinutes` in [Remote Config](remote-config.md)).
+- Detects host-app debug flag (`ApplicationInfo.FLAG_DEBUGGABLE`); when set, the SDK dumps every resolved RC value to logcat after fetch under tag `HouseAdRepo`.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -40,7 +42,7 @@ Internally:
 fun onActionCompleted(context: Context)
 ```
 
-Signal that the user completed a qualifying action (save, download, share, export, etc.). The SDK increments an internal counter and triggers an interstitial after every `interstitialTriggerThreshold` calls (default: 3, overridable via RC).
+Signal that the user completed a qualifying action (save, download, share, export, etc.). The SDK increments two counters: an internal threshold counter, and a persisted lifetime action counter used by the progressive cadence ramp. An interstitial fires after every `interstitialTriggerThreshold` calls — the effective threshold ramps from `interstitialTriggerThresholdStart` down to `interstitialTriggerThreshold` as the user accumulates sessions/actions. See [Remote Config](remote-config.md#how-the-ramp-works) for the math.
 
 **Decision tree when threshold is reached:**
 1. If it's the house-ad interstitial turn AND a house ad is eligible → show house-ad full screen, preload FAN for next time.
@@ -58,12 +60,14 @@ Counter resets to zero each time the threshold is hit.
 fun <T> buildAdList(items: List<T>, context: Context): List<AdListItem<T>>
 ```
 
-Builds a mixed list with house-ad placeholders injected at the configured `contentAdInterval` (default: 4, overridable via RC).
+Builds a mixed list with house-ad placeholders injected at the *effective* `contentAdInterval`. The interval ramps from `contentAdIntervalStart` to `contentAdInterval` based on user engagement (see [Remote Config](remote-config.md#how-the-ramp-works)). Default is `-1` (disabled) when no RC is configured.
 
-| `contentAdInterval` | Behaviour |
-|---------------------|-----------|
+| Effective `contentAdInterval` | Behaviour |
+|-------------------------------|-----------|
 | `-1` or `0` | Returns `items` unchanged — no ads injected |
 | `N > 0` | 1 house ad after every N real items |
+
+> **Important — re-build when inventory arrives.** RC fetch is async. On the first composition the inventory is empty and this method returns `items` unchanged. Consumers that call `buildAdList` inside `remember(items)` must include `AdsSDK.houseAds` as a key, otherwise the empty result is cached forever. See [houseAds](#houseads).
 
 The eligible house-ad queue is built from currently uninstalled apps, in priority order. If the queue is exhausted before all injection points are filled, remaining slots are silently skipped (no gap in the list).
 
@@ -120,6 +124,37 @@ val theme: AdTheme
 ```
 
 The `AdTheme` passed in `AdConfig`. Available after `init()`. Used by the SDK's default composables; also available to host app code that needs to match SDK colors.
+
+---
+
+#### `houseAds`
+
+```kotlin
+val houseAds: StateFlow<List<HouseAdConfig>>
+```
+
+Live house-ad inventory parsed from `house_ads` Remote Config. Starts as an empty list and updates when the async RC fetch completes.
+
+Composables that eagerly pick an ad (banner slot, mixed content list) **must** use this as a `remember` key — otherwise they cache `null` from before the fetch landed and never recover:
+
+```kotlin
+val houseAds by AdsSDK.houseAds.collectAsStateWithLifecycle()
+val mixedList = remember(items, houseAds) { AdsSDK.buildAdList(items, context) }
+```
+
+`AdBannerSlot` does this automatically.
+
+---
+
+### `setForceLoyalTier(enabled)`
+
+```kotlin
+fun setForceLoyalTier(enabled: Boolean)
+```
+
+QA / debug override. When `true`, the progressive-cadence resolver treats the user as fully loyal (`progress = 1.0`), so the effective interstitial threshold and content-ad interval immediately collapse to their RC target values. Useful for verifying target-rate UX without waiting for a real user to graduate.
+
+In-memory only — resets to `false` on process restart. Safe to call before `init()`; the flag will apply once the SDK is initialized.
 
 ---
 
@@ -317,9 +352,9 @@ fun HouseAdBanner(
 )
 ```
 
-SDK default banner UI. 50 dp tall (matches FAN banner height). Layout: `[Ad pill] [icon] [title/subtitle] [CTA button]`. CTA opens `config.playStoreUrl` via `Intent.ACTION_VIEW`. Calls `onShown()` via `LaunchedEffect` on first composition.
+SDK default banner UI. 50 dp tall (matches FAN banner height). Layout: vertically-centered `[icon] [title/subtitle] [CTA button]` row, with a small "Ad" badge floating in the top-left corner. CTA opens `config.playStoreUrl` via `Intent.ACTION_VIEW`. Calls `onShown()` via `LaunchedEffect` on first composition.
 
-Themed via `LocalAdTheme`.
+Themed via `LocalAdTheme`. Includes `@Preview` composables for inspecting layout in Android Studio without running the app.
 
 ---
 

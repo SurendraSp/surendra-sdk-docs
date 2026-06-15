@@ -9,10 +9,10 @@ This document is a self-contained reference for AI agents integrating the Smart 
 | | |
 |---|---|
 | **Library** | Smart Ads SDK |
-| **Maven coordinate** | `com.github.SurendraSp:smart-ads:1.0.4` |
+| **Maven coordinate** | `com.github.SurendraSp:smart-ads:1.0.6-RC` |
 | **GitHub Packages URL** | `https://maven.pkg.github.com/SurendraSp/SmartAdsSDK` |
 | **Root package** | `io.surendrasp.ads` |
-| **Current version** | `1.0.4` |
+| **Current version** | `1.0.6-RC` |
 | **minSdk** | 26 |
 | **compileSdk** | 37 |
 | **Kotlin** | 2.x |
@@ -65,7 +65,7 @@ In the app module's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.github.SurendraSp:smart-ads:1.0.4")
+    implementation("com.github.SurendraSp:smart-ads:1.0.6-RC")
 
     // Required peer dependencies
     implementation("io.coil-kt:coil-compose:2.7.0")                            // image loading
@@ -174,7 +174,10 @@ import io.surendrasp.ads.ui.HouseAdCard
 @Composable
 fun ContentGrid(items: List<MyItem>) {
     val context = LocalContext.current
-    val mixedList = remember(items) { AdsSDK.buildAdList(items, context) }
+    // CRITICAL: use AdsSDK.houseAds as a remember key. RC fetch is async; without
+    // this the first composition caches a "no ads" result and never refreshes.
+    val houseAds  by AdsSDK.houseAds.collectAsStateWithLifecycle()
+    val mixedList = remember(items, houseAds) { AdsSDK.buildAdList(items, context) }
 
     LazyVerticalGrid(columns = GridCells.Fixed(3)) {
         items(mixedList) { listItem ->
@@ -199,9 +202,11 @@ object AdsSDK {
     fun onActionCompleted(context: Context)
     fun <T> buildAdList(items: List<T>, context: Context): List<AdListItem<T>>
     fun nextHouseAd(context: Context): HouseAdConfig?
+    fun setForceLoyalTier(enabled: Boolean)
 
     val showFanBanner: StateFlow<Boolean>
     val showHouseAdFullScreen: SharedFlow<HouseAdConfig>
+    val houseAds: StateFlow<List<HouseAdConfig>>
     val interstitialCloseDurationSec: StateFlow<Int>
     val theme: AdTheme
 }
@@ -209,12 +214,14 @@ object AdsSDK {
 
 | Member | Description |
 |--------|-------------|
-| `init(context, config)` | Initialize. Call once in `Application.onCreate()`. Idempotent. |
-| `onActionCompleted(context)` | Increment action counter; trigger interstitial at threshold. |
-| `buildAdList(items, context)` | Return mixed list with house-ad placeholders injected every `contentAdInterval` items. |
+| `init(context, config)` | Initialize. Call once in `Application.onCreate()`. Idempotent. Also counts as a session start (debounced via `sessionDebounceMinutes`). |
+| `onActionCompleted(context)` | Increment action counter; trigger interstitial at the effective threshold (ramped). Also bumps the persisted lifetime action counter for the progressive cadence ramp. |
+| `buildAdList(items, context)` | Return mixed list with house-ad placeholders injected every effective `contentAdInterval` items. **Caller must use `houseAds` as a `remember` key** — RC fetch is async; without this the first call returns no ads and the result is cached. |
 | `nextHouseAd(context)` | Next uninstalled house ad in round-robin rotation, or `null` if all installed. |
+| `setForceLoyalTier(enabled)` | QA override: when `true`, pin user to loyal tier so target cadence applies immediately. In-memory only. |
 | `showFanBanner` | `true` when FAN banner should show. Managed internally by `AdBannerSlot`. |
 | `showHouseAdFullScreen` | Emits `HouseAdConfig` when a full-screen interstitial should show. Consumed by `HouseAdFullScreenHost`. |
+| `houseAds` | Live house-ad inventory from RC. Empty until the async fetch completes. Use as a `remember` key in any composable that eagerly picks an ad. |
 | `interstitialCloseDurationSec` | Live close-button delay in seconds. Updated from RC after fetch. |
 | `theme` | The `AdTheme` from `AdConfig`. Available after `init()`. |
 
@@ -233,15 +240,20 @@ data class AdConfig(
 )
 ```
 
-All cadence and timing values (`bannerHouseCadence`, `interstitialHouseCadence`, `contentAdInterval`, `interstitialTriggerThreshold`, `interstitialCloseDurationSec`) are configured via the `ads_cadence_config` Firebase Remote Config key. SDK built-in defaults:
+All cadence and timing values are configured via the `ads_cadence_config` Firebase Remote Config key. SDK built-in defaults (1.0.6-RC):
 
-| Setting | Default |
-|---------|---------|
-| `bannerHouseCadence` | 50 |
-| `interstitialHouseCadence` | 10 |
-| `contentAdInterval` | 4 |
-| `interstitialTriggerThreshold` | 3 |
-| `interstitialCloseSec` | 5 |
+| Setting | Default | Notes |
+|---------|---------|-------|
+| `bannerHouseCadence` | `-1` | **House ads disabled by default** — set in RC to enable |
+| `interstitialHouseCadence` | `-1` | **House ads disabled by default** — set in RC to enable |
+| `contentAdInterval` | `-1` | **No content ads by default** — set in RC to enable |
+| `interstitialTriggerThreshold` | `3` | When an interstitial fires (still active even without house ads — affects FAN too) |
+| `interstitialCloseSec` | `5` | Close-button delay for house-ad full-screen |
+| `loyalSessionCount` | `15` | Sessions until ramp completes |
+| `loyalActionCount` | `100` | Actions until ramp completes |
+| `sessionDebounceMinutes` | `20` | Debounce window for session counting |
+
+**FAN-only fallback:** without `house_ads` or `ads_cadence_config` in RC, the SDK runs in FAN-only mode automatically — every slot routes to FAN, no house ads are shown.
 
 **Cadence semantics:**
 
@@ -250,6 +262,8 @@ All cadence and timing values (`bannerHouseCadence`, `interstitialHouseCadence`,
 | `-1` | House ads disabled; FAN only | No ads injected |
 | `0` | Always show house ad; FAN never used | No ads injected (treated same as `-1`) |
 | `N > 0` | 1 house ad per N FAN impressions | 1 house ad per N content items |
+
+**Progressive ramp (1.0.6-RC):** `interstitialTriggerThreshold` and `contentAdInterval` are *ramped* — they interpolate linearly from a `*Start` value down to the target as the user accumulates sessions/actions. Omit the `*Start` key in RC → start defaults to target → no ramp.
 
 ---
 
@@ -440,25 +454,47 @@ Banner and interstitial slots cycle through all eligible apps in **round-robin**
 
 ### `ads_cadence_config`
 
-JSON object. All fields optional. Overrides SDK built-in defaults at runtime.
+JSON object. All fields optional. Missing → FAN-only mode (no house ads).
 
 ```json
 {
-  "interstitialCloseSec":         5,
-  "bannerHouseCadence":           50,
-  "interstitialHouseCadence":     10,
-  "contentAdInterval":            4,
-  "interstitialTriggerThreshold": 3
+  "interstitialCloseSec":              5,
+  "bannerHouseCadence":                50,
+  "interstitialHouseCadence":          10,
+
+  "contentAdInterval":                 5,
+  "contentAdIntervalStart":            10,
+
+  "interstitialTriggerThreshold":      3,
+  "interstitialTriggerThresholdStart": 20,
+
+  "loyalSessionCount":                 15,
+  "loyalActionCount":                  100,
+  "sessionDebounceMinutes":            20
 }
 ```
 
 | Field | SDK default | Description |
 |-------|-------------|-------------|
 | `interstitialCloseSec` | `5` | Seconds before close button appears; drives countdown ring; exposed as `AdsSDK.interstitialCloseDurationSec` |
-| `bannerHouseCadence` | `50` | House-ad cadence for banner slot |
-| `interstitialHouseCadence` | `10` | House-ad cadence for interstitial slot |
-| `contentAdInterval` | `4` | Inject 1 house-ad card per N real content items |
-| `interstitialTriggerThreshold` | `3` | `onActionCompleted()` calls before an interstitial fires |
+| `bannerHouseCadence` | `-1` | House-ad cadence for banner slot. **Disabled by default — set explicitly.** |
+| `interstitialHouseCadence` | `-1` | House-ad cadence for interstitial slot. **Disabled by default — set explicitly.** |
+| `contentAdInterval` | `-1` | Target content-ad interval. **Disabled by default — set explicitly.** |
+| `contentAdIntervalStart` | = `contentAdInterval` | New-user starting interval; ramps down to target. Omit → no ramp. |
+| `interstitialTriggerThreshold` | `3` | Target action count between interstitials. |
+| `interstitialTriggerThresholdStart` | = `interstitialTriggerThreshold` | New-user starting threshold; ramps down to target. Omit → no ramp. |
+| `loyalSessionCount` | `15` | Cold-start sessions until the ramp completes. |
+| `loyalActionCount` | `100` | Total actions until the ramp completes (whichever signal hits first wins). |
+| `sessionDebounceMinutes` | `20` | A cold start only counts as a new session if more than this many minutes have passed since last activity. |
+
+**Ramp math:**
+```
+progress  = min(1.0, max(sessions / loyalSessionCount, actions / loyalActionCount))
+effective = start + (target - start) * progress
+```
+`interstitialTriggerThreshold` rounds up (favours user); `contentAdInterval` rounds nearest. Short-circuits to `target` when `start == target`.
+
+`AdsSDK.setForceLoyalTier(true)` pins `progress = 1.0` for QA.
 
 Changes take effect on the next impression after RC fetch completes (no restart required).
 
@@ -524,15 +560,18 @@ is AdListItem.HouseAd -> MyCustomAdCard(item.config)
 
 When `AdsSDK.onActionCompleted(context)` is called:
 
-1. Increment internal action counter.
-2. If `actionCount % interstitialTriggerThreshold != 0` → stop (not at threshold yet).
-3. Reset action counter.
-4. Evaluate house-ad interstitial turn (`fanInterstitialCount % interstitialHouseCadence == 0`):
+1. Increment the persisted lifetime action counter (drives the cadence ramp).
+2. Increment internal threshold counter.
+3. Compute *effective* `interstitialTriggerThreshold` by interpolating from `interstitialTriggerThresholdStart` to `interstitialTriggerThreshold` based on user engagement progress (sessions + actions vs. `loyalSessionCount` / `loyalActionCount`).
+4. If `effectiveThreshold <= 0` → stop (slot disabled).
+5. If `actionCount % effectiveThreshold != 0` → stop (not at threshold yet).
+6. Reset action counter.
+7. Evaluate house-ad interstitial turn (`fanInterstitialCount % interstitialHouseCadence == 0`):
    - If it's a house turn AND `interstitialHouseCadence != -1` AND an eligible house ad exists → emit to `showHouseAdFullScreen`, preload FAN for next time, log `interstitial_shown(source="house")`, return.
    - If all apps installed → log `house_ad_skipped`, fall through to FAN.
-5. If `fanInterstitial.isReady` → show FAN interstitial, log `interstitial_shown(source="fan")`.
-6. FAN not ready AND `interstitialHouseCadence != -1` AND eligible house ad exists → emit to `showHouseAdFullScreen`, log `interstitial_shown(source="house_fallback")`.
-7. Nothing shown → silent skip.
+8. If `fanInterstitial.isReady` → show FAN interstitial, log `interstitial_shown(source="fan")`.
+9. FAN not ready AND `interstitialHouseCadence != -1` AND eligible house ad exists → emit to `showHouseAdFullScreen`, log `interstitial_shown(source="house_fallback")`.
+10. Nothing shown → silent skip.
 
 ---
 
@@ -558,11 +597,14 @@ When `AdsSDK.onActionCompleted(context)` is called:
 
 `AdsSDK.buildAdList(items, context)` works as follows:
 
-- If `contentAdInterval <= 0` (i.e., `-1` or `0`) or `items` is empty → return `items` unchanged as `AdListItem.Content`. Note: `0` is treated as disabled, not "always inject".
+- Compute *effective* `contentAdInterval` by interpolating from `contentAdIntervalStart` to `contentAdInterval` based on user engagement progress (same math as the interstitial threshold).
+- If effective interval `<= 0` (i.e., `-1` or `0`) or `items` is empty → return `items` unchanged as `AdListItem.Content`. Note: `0` is treated as disabled, not "always inject".
 - Build eligible queue: all uninstalled apps in priority order.
 - If queue is empty → return `items` unchanged.
-- Iterate `items`; after every `contentAdInterval` items, pop one ad from the queue and append `AdListItem.HouseAd`.
+- Iterate `items`; after every N items (effective interval), pop one ad from the queue and append `AdListItem.HouseAd`.
 - When queue is exhausted, remaining injection points are silently skipped (no gap).
+
+**Important:** because the eligible queue is empty until Remote Config fetches, callers using `remember(items) { buildAdList(...) }` will cache a no-ads list forever. Always include `AdsSDK.houseAds` as a `remember` key.
 
 ---
 
@@ -582,7 +624,7 @@ Use this checklist to verify a complete integration:
 
 ### Repository & dependency setup
 - [ ] `settings.gradle.kts` has the `SmartAdsSDK` Maven repository block with credential providers
-- [ ] `build.gradle.kts` has `implementation("com.github.SurendraSp:smart-ads:1.0.4")`
+- [ ] `build.gradle.kts` has `implementation("com.github.SurendraSp:smart-ads:1.0.6-RC")`
 - [ ] `build.gradle.kts` has `io.coil-kt:coil-compose:2.x`
 - [ ] `build.gradle.kts` has Firebase BOM + `firebase-analytics` + `firebase-config`
 - [ ] `com.facebook.android:audience-network-sdk` is **not** added manually (it's bundled)
@@ -616,9 +658,10 @@ Use this checklist to verify a complete integration:
 - [ ] `HouseAdCard` (or custom composable) rendered for `AdListItem.HouseAd`
 
 ### Firebase Remote Config
-- [ ] `house_ads` RC key configured with a JSON array of at least one house ad
+- [ ] `house_ads` RC key configured with a JSON array of at least one house ad — **without this, the SDK runs FAN-only**
 - [ ] Each house-ad entry has `packageName`, `title`, `playStoreUrl`
-- [ ] `ads_cadence_config` RC key configured (or left absent to use SDK built-in defaults)
+- [ ] `ads_cadence_config` RC key configured with at minimum `bannerHouseCadence`, `interstitialHouseCadence`, `contentAdInterval` — **without this, the SDK runs FAN-only**
+- [ ] (Optional) `*Start` and `loyal*` keys set to enable the progressive cadence ramp for new users
 - [ ] RC minimum fetch interval set to 0 for debug builds (optional but recommended for testing)
 
 ### Theming (optional)
@@ -645,9 +688,11 @@ Use this checklist to verify a complete integration:
 | Mistake | Fix |
 |---------|-----|
 | `AdsSDK not initialized` crash | `AdsSDK.init()` not called before `AdsSDK.onActionCompleted()` or composable composition. Ensure `init()` is in `Application.onCreate()` and the Application is registered in the manifest. |
-| No house ads shown | All apps in `house_ads` are installed on the test device. Add an app that is not installed. |
+| House ads never appear, only FAN | (1.0.6-RC) Either `house_ads` or `ads_cadence_config` is missing from Remote Config — house ads are opt-in and require both. Or all apps in `house_ads` are installed on the test device. Or `bannerHouseCadence` / `interstitialHouseCadence` left at default `-1`. |
+| Content ads never appear in mixed list | The caller did `remember(items) { buildAdList(...) }` without keying on `AdsSDK.houseAds`. RC fetch is async — first call returned empty, result cached forever. Add `houseAds` to the `remember` key list. |
+| Interstitial fires less often than expected for new users | (1.0.6-RC) Progressive cadence ramp is active. Either bump up engagement (more sessions/actions) to graduate to target rate, or call `AdsSDK.setForceLoyalTier(true)` for QA, or set `interstitialTriggerThresholdStart = interstitialTriggerThreshold` in RC to disable the ramp. |
 | Banner not visible | `showFanBanner` may be `false` because FAN failed and no house ad is eligible. Check that `house_ads` RC key has a valid entry. |
-| Interstitial never fires | `onActionCompleted()` not called, or called fewer than `interstitialTriggerThreshold` times. Or `HouseAdFullScreenHost` is inside `Scaffold` (overlay won't render correctly). |
+| Interstitial never fires | `onActionCompleted()` not called, or called fewer than the effective `interstitialTriggerThreshold` times. Or `HouseAdFullScreenHost` is inside `Scaffold` (overlay won't render correctly). |
 | Duplicate class error at build | `firebase-analytics` or `firebase-config` added as `implementation` without BOM, conflicting with a version already in the project. Use Firebase BOM. |
 | Missing Coil crash | `coil-compose` not added to the app's dependencies. SDK declares it `compileOnly`. |
 | `422 Unprocessable Entity` on publish | Only relevant if publishing a new SDK version. Bump `VERSION_NAME` in `gradle.properties` — versions cannot be overwritten on GitHub Packages. |

@@ -1,6 +1,6 @@
 # Smart Ads SDK — Getting Started
 
-**Maven:** `com.github.SurendraSp:smart-ads:1.0.4`  
+**Maven:** `com.github.SurendraSp:smart-ads:1.0.6-RC`  
 **Registry:** `https://maven.pkg.github.com/SurendraSp/SmartAdsSDK`  
 **Namespace:** `io.surendrasp.ads`
 
@@ -91,7 +91,7 @@ In your app's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.github.SurendraSp:smart-ads:1.0.4")
+    implementation("com.github.SurendraSp:smart-ads:1.0.6-RC")
 
     // Required peer dependencies — the SDK declares these compileOnly to avoid version conflicts
     implementation("io.coil-kt:coil-compose:2.7.0")
@@ -143,7 +143,9 @@ class MyApp : Application() {
 }
 ```
 
-> **Cadence and timing** (how often ads show, how long the close countdown is) are controlled via Firebase Remote Config key `ads_cadence_config` — no code changes needed to tune them. See [Remote Config](remote-config.md) for the full schema and SDK built-in defaults.
+> **Cadence and timing** (how often ads show, how long the close countdown is, how aggressively to ramp ads for new users) are controlled via Firebase Remote Config key `ads_cadence_config` — no code changes needed to tune them. See [Remote Config](remote-config.md) for the full schema, the progressive-cadence ramp behaviour, and SDK built-in defaults.
+
+> **House ads are opt-in.** Without both `house_ads` and `ads_cadence_config` Remote Config entries, the SDK runs in FAN-only mode automatically. See the [FAN-only fallback](remote-config.md#fan-only-fallback-106-rc-and-later) section.
 
 Register `MyApp` in `AndroidManifest.xml`:
 
@@ -198,7 +200,7 @@ Button(onClick = {
 }
 ```
 
-An interstitial fires after every `interstitialTriggerThreshold` calls (RC default: 3).
+An interstitial fires after every `interstitialTriggerThreshold` calls. The *effective* threshold ramps from `interstitialTriggerThresholdStart` (gentle, for new users) down to `interstitialTriggerThreshold` (the steady-state target) as the user racks up sessions and actions. See [Remote Config — How the ramp works](remote-config.md#how-the-ramp-works).
 
 ### Content / In-feed ads
 
@@ -208,8 +210,11 @@ fun GalleryScreen(viewModel: GalleryViewModel) {
     val items   by viewModel.items.collectAsState()
     val context = LocalContext.current
 
-    // Inject house-ad placeholders every contentAdInterval items
-    val mixedList = remember(items) { AdsSDK.buildAdList(items, context) }
+    // Inject house-ad placeholders at the effective contentAdInterval.
+    // Key on AdsSDK.houseAds so the list rebuilds when RC fetch lands —
+    // without this the first composition caches a no-ads result forever.
+    val houseAds  by AdsSDK.houseAds.collectAsStateWithLifecycle()
+    val mixedList = remember(items, houseAds) { AdsSDK.buildAdList(items, context) }
 
     LazyVerticalGrid(columns = GridCells.Fixed(3)) {
         items(mixedList) { item ->

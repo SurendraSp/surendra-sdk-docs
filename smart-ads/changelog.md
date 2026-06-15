@@ -1,5 +1,30 @@
 # Smart Ads SDK — Changelog
 
+## 1.0.6-RC
+
+### New features
+
+- **Progressive ad cadence (ramp for new users)** — the interstitial trigger threshold and content-ad interval now ramp linearly from a gentle starting rate down to the configured target as the user accumulates sessions and actions. Brand-new users see fewer ads; loyal users converge on the steady-state cadence. Configured entirely via Remote Config — see new `*Start`, `loyalSessionCount`, `loyalActionCount`, `sessionDebounceMinutes` keys in [Remote Config](remote-config.md).
+- **`AdsSDK.houseAds: StateFlow<List<HouseAdConfig>>`** — live house-ad inventory. Composables that eagerly pick an ad (banner slot, custom mixed lists) should key their `remember` off this so they re-pick when the async RC fetch lands, instead of caching `null` from before the fetch.
+- **`AdsSDK.setForceLoyalTier(Boolean)`** — QA / debug override. When `true`, the SDK skips the ramp and applies target cadence regardless of session/action counts. In-memory only; resets on process restart.
+- **Auto-debug logging** — when the host app is built with `debuggable=true` (`FLAG_DEBUGGABLE`), the SDK dumps every resolved RC value and the parsed house-ad inventory to logcat under tag `HouseAdRepo`. Release builds stay silent.
+
+### Behaviour changes
+
+- **House ads are now strictly opt-in.** Without an `ads_cadence_config` Remote Config entry, all house-ad cadences default to `-1` (disabled) — every slot routes to FAN automatically. Without a `house_ads` entry, the inventory is empty and the SDK ships with **no** hardcoded fallback ad. Existing apps that set both RC keys behave exactly as before.
+- **House-ad cadence defaults removed.** `bannerHouseCadence`, `interstitialHouseCadence`, and `contentAdInterval` no longer default to `50`/`10`/`4` when RC is missing — they default to `-1`. `interstitialTriggerThreshold` still defaults to `3` since it controls *when* an interstitial fires, not whether it's house or FAN.
+
+### Backwards compatibility
+
+- All new RC keys are optional. Omit the `*Start` keys → start defaults to target → no ramp → identical to 1.0.4 behaviour. If you want the ramp, set the `*Start` keys explicitly.
+- No source-code changes required for existing host apps — the `AdConfig` API is unchanged.
+
+### UI polish
+
+- `HouseAdBanner` — content row is now properly vertically centered; the "Ad" badge is pinned to the top-left corner instead of stealing horizontal space from the icon. Added `@Preview` composables so the banner renders in Android Studio's preview pane.
+
+---
+
 ## 1.0.4
 
 ### Bug fixes
