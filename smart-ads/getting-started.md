@@ -93,19 +93,26 @@ In your app's `build.gradle.kts`:
 dependencies {
     implementation("com.github.SurendraSp:smart-ads:1.0.6-RC")
 
-    // Required peer dependencies — the SDK declares these compileOnly to avoid version conflicts
-    implementation("io.coil-kt:coil-compose:2.7.0")
+    // ── Required peer dependencies ────────────────────────────────────────────
+    // The SDK declares these compileOnly to keep its AAR lean and let you control
+    // versions. If any of these are missing at runtime the app will crash with
+    // ClassNotFoundException. Facebook Audience Network is the only bundled dep —
+    // you do NOT need to add it separately.
 
+    // Coil 3 — SDK uses AsyncImage for house-ad icons
+    implementation("io.coil-kt.coil3:coil-compose:3.5.0")
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.5.0")  // required for URL image loading
+
+    // Firebase
     implementation(platform("com.google.firebase:firebase-bom:34.14.1"))
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-config")
 }
 ```
 
-> **Why these peer deps?**  
-> Coil is `compileOnly` in the SDK so the host app controls which Coil version is used.  
-> Firebase is `compileOnly` because bundling it would cause duplicate-class errors at build time (host apps always have Firebase).  
-> Facebook Audience Network is bundled by the SDK — you do not need to add it separately.
+> **Minimum versions.** The SDK is compiled against the versions above. Your app may use higher versions — Gradle's highest-wins rule ensures compatibility. Using a *lower* version than listed risks a `NoSuchMethodException` at runtime.
+
+> **Facebook Audience Network** is bundled inside the SDK AAR — do not add it to your own `build.gradle`.
 
 ---
 
