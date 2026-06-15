@@ -1,5 +1,14 @@
 # Smart Ads SDK — Changelog
 
+## 1.0.6-RC2
+
+### Bug fixes
+
+- **House ads shown for already-installed apps (Android 11+)** — `HouseAdEngine.isInstalled()` used `PackageManager.getPackageInfo()` which silently throws `NameNotFoundException` on API 30+ for any package not declared in `<queries>`, even if installed. The SDK manifest now declares a `<queries>` intent filter for `ACTION_MAIN + CATEGORY_LAUNCHER`, making all launcher-visible apps queryable. No host-app manifest change required (AAR manifests merge automatically). No Play Store policy concern — `<queries>` intent filters are Google's recommended alternative to the restricted `QUERY_ALL_PACKAGES` permission.
+- **Release build failure** — `@Preview` composables in `HouseAdBanner.kt` referenced `androidx.compose.ui.tooling.preview.Preview`, which is a `debugImplementation`-only artifact. Release compilation failed with `Unresolved reference 'tooling'`. Previews are now in a separate `src/debug/` source set file (`HouseAdBannerPreviews.kt`) and are excluded from release builds automatically.
+
+---
+
 ## 1.0.6-RC
 
 ### New features
