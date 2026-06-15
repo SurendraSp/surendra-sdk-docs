@@ -1,5 +1,28 @@
 # Smart Ads SDK — Changelog
 
+## 1.0.6-RC3
+
+### Dependency changes — action required for host apps
+
+- **Coil upgraded 2.7.0 → 3.5.0.** Coil 3 changed its Maven group ID. Host apps must update their Coil dependency:
+  ```kotlin
+  // Remove old:
+  implementation("io.coil-kt:coil-compose:2.7.0")
+
+  // Add new:
+  implementation("io.coil-kt.coil3:coil-compose:3.5.0")
+  implementation("io.coil-kt.coil3:coil-network-okhttp:3.5.0")  // required in Coil 3 for URL image loading
+  ```
+  The import package in Kotlin also changed: `coil.compose.AsyncImage` → `coil3.compose.AsyncImage` (SDK updated internally; no change needed in host-app code).
+
+### Build optimisations
+
+- **Compose UI / graphics / Material3 moved to `compileOnly`** — these are no longer bundled inside the SDK AAR. Every app using the SDK already has Jetpack Compose on its classpath, so this reduces the AAR size without any host-app impact.
+- **Resolution strategy added** — Facebook Audience Network ships decade-old `{strictly}` version constraints on `play-services-basement`, `org.jetbrains:annotations`, and `androidx.savedstate`. These conflicted with AGP 9.x consistent resolution when Compose was made `compileOnly`. The SDK now forces modern versions of these three packages via `resolutionStrategy` so host apps are not affected.
+- **`consumer-rules.pro` updated** — added AndroidX Lifecycle observer rules and Coil 3 `dontwarn` entries so R8 in host-app release builds does not strip required lifecycle observer registrations.
+
+---
+
 ## 1.0.6-RC2
 
 ### Bug fixes

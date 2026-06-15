@@ -1,6 +1,6 @@
 # Smart Ads SDK — Getting Started
 
-**Maven:** `com.github.SurendraSp:smart-ads:1.0.6-RC`  
+**Maven:** `com.github.SurendraSp:smart-ads:1.0.6-RC3`  
 **Registry:** `https://maven.pkg.github.com/SurendraSp/SmartAdsSDK`  
 **Namespace:** `io.surendrasp.ads`
 
@@ -18,7 +18,8 @@
 | Facebook Audience Network | 6.21.0 |
 | Firebase Analytics | via BOM 34.x |
 | Firebase Remote Config | via BOM 34.x |
-| Coil Compose | 2.x *(host app must provide)* |
+| Coil Compose | 3.5.0 *(host app must provide)* |
+| Coil Network OkHttp | 3.5.0 *(host app must provide)* |
 
 ---
 
@@ -91,7 +92,7 @@ In your app's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.github.SurendraSp:smart-ads:1.0.6-RC")
+    implementation("com.github.SurendraSp:smart-ads:1.0.6-RC3")
 
     // ── Required peer dependencies ────────────────────────────────────────────
     // The SDK declares these compileOnly to keep its AAR lean and let you control

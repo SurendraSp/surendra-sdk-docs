@@ -8,7 +8,7 @@ Public documentation for all Android SDKs published under [SurendraSp](https://g
 
 | SDK | Version | Description |
 |-----|---------|-------------|
-| [Smart Ads](smart-ads/getting-started.md) | `1.0.6-RC` | FAN + house-ad cross-sell banner, interstitial, and in-feed ads with progressive cadence ramping and Firebase Remote Config |
+| [Smart Ads](smart-ads/getting-started.md) | `1.0.6-RC3` | FAN + house-ad cross-sell banner, interstitial, and in-feed ads with progressive cadence ramping and Firebase Remote Config |
 
 ---
 
@@ -30,7 +30,7 @@ Public documentation for all Android SDKs published under [SurendraSp](https://g
 ## Maven coordinates
 
 ```
-com.github.SurendraSp:smart-ads:1.0.6-RC
+com.github.SurendraSp:smart-ads:1.0.6-RC3
 ```
 
 Registry: `https://maven.pkg.github.com/SurendraSp/SmartAdsSDK`
