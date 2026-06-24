@@ -1,5 +1,17 @@
 # Smart Ads Mediation SDK — Changelog
 
+## 1.0.0-RC4 *(2026-06-24)*
+
+### Improvements
+
+- **Banner ad Logcat logging** — three new log lines to simplify debugging:
+  - `AdBannerSlot D  Banner request → <adUnitId> (320×50dp)` — fires when `loadAd()` is called
+  - `AdOrchestrator D  Banner loaded` — fires on successful fill
+  - `AdOrchestrator W  Banner load failed (<code>) from admob: <message>` — fires on failure
+- **Banner content spacing** — root-level `AdBannerSlot` now correctly reserves bottom padding so screen content is never hidden behind the banner.
+
+---
+
 ## 1.0.0-RC3 *(2026-06-24)*
 
 ### Bug fixes
