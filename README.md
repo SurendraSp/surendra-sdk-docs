@@ -9,7 +9,7 @@ Public documentation for all Android SDKs published under [SurendraSp](https://g
 | SDK | Version | Description |
 |-----|---------|-------------|
 | [Smart Ads](smart-ads/getting-started.md) | `1.0.6-RC3` | FAN + house-ad cross-sell banner, interstitial, and in-feed ads with progressive cadence ramping and Firebase Remote Config |
-| [Smart Ads Mediation](smart-ads-mediation/getting-started.md) | `1.0.0-RC2` | AdMob mediation variant — banner and interstitial via AdMob waterfall (FAN, InMobi, Google demand) with house-ad cross-sell preserved |
+| [Smart Ads Mediation](smart-ads-mediation/getting-started.md) | `1.0.0-RC3` | AdMob mediation variant — banner and interstitial via AdMob waterfall (FAN, InMobi, Google demand) with house-ad cross-sell preserved |
 
 ---
 
@@ -49,7 +49,7 @@ com.github.SurendraSp:smart-ads:1.0.6-RC3
 ### Smart Ads Mediation SDK (AdMob mediation)
 
 ```
-io.surendrasp:ads-sdk-mediation:1.0.0-RC2
+io.surendrasp:ads-sdk-mediation:1.0.0-RC3
 ```
 
 Registry: `https://maven.pkg.github.com/SurendraSp/SmartAdsSDK`

@@ -1,6 +1,6 @@
 # Smart Ads Mediation SDK — Getting Started
 
-**Maven:** `io.surendrasp:ads-sdk-mediation:1.0.0-RC2`  
+**Maven:** `io.surendrasp:ads-sdk-mediation:1.0.0-RC3`  
 **Registry:** `https://maven.pkg.github.com/SurendraSp/SmartAdsSDK`  
 **Namespace:** `io.surendrasp.ads.mediation`
 
@@ -83,7 +83,7 @@ In your app's `build.gradle.kts`:
 ```kotlin
 dependencies {
     // Core mediation SDK (ads-sdk-kit is pulled in transitively)
-    implementation("io.surendrasp:ads-sdk-mediation:1.0.0-RC2")
+    implementation("io.surendrasp:ads-sdk-mediation:1.0.0-RC3")
 
     // ── Required peer dependencies ────────────────────────────────────────────
     // The SDK declares these compileOnly to keep the AAR lean.

@@ -1,7 +1,7 @@
 # Smart Ads Mediation SDK — API Reference
 
 **Package:** `io.surendrasp.ads.mediation`  
-**Maven:** `io.surendrasp:ads-sdk-mediation:1.0.0-RC2`
+**Maven:** `io.surendrasp:ads-sdk-mediation:1.0.0-RC3`
 
 ---
 

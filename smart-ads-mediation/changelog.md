@@ -1,5 +1,14 @@
 # Smart Ads Mediation SDK — Changelog
 
+## 1.0.0-RC3 *(2026-06-24)*
+
+### Bug fixes
+
+- **Banner flash with house ads disabled** — when `bannerHouseCadence = -1`, a house ad was briefly visible while the AdMob banner was loading. The house ad composable was incorrectly treated as a loading placeholder. Fixed: house ad now only renders when `AdOrchestrator` explicitly routes to it (`showNetworkBanner = false`). While AdMob is loading the banner area collapses to 0 dp.
+- **App Open cooldown logic** — replaced the "minimum background duration" gate with a post-show cooldown. Before the first show there is no restriction — the ad fires whenever the app foregrounds and an ad is ready. After each show a 30-second cooldown is enforced; foreground resumes within that window are skipped silently.
+
+---
+
 ## 1.0.0-RC2 *(2026-06-24)*
 
 ### New feature — App Open ads
