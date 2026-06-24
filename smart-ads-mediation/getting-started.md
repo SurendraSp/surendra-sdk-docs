@@ -1,6 +1,6 @@
 # Smart Ads Mediation SDK — Getting Started
 
-**Maven:** `io.surendrasp:ads-sdk-mediation:1.0.0-RC1`  
+**Maven:** `io.surendrasp:ads-sdk-mediation:1.0.0-RC2`  
 **Registry:** `https://maven.pkg.github.com/SurendraSp/SmartAdsSDK`  
 **Namespace:** `io.surendrasp.ads.mediation`
 
@@ -83,7 +83,7 @@ In your app's `build.gradle.kts`:
 ```kotlin
 dependencies {
     // Core mediation SDK (ads-sdk-kit is pulled in transitively)
-    implementation("io.surendrasp:ads-sdk-mediation:1.0.0-RC1")
+    implementation("io.surendrasp:ads-sdk-mediation:1.0.0-RC2")
 
     // ── Required peer dependencies ────────────────────────────────────────────
     // The SDK declares these compileOnly to keep the AAR lean.
@@ -147,6 +147,10 @@ class MyApp : Application() {
                 // AdMob ad unit IDs from the AdMob console
                 admobBannerAdUnitId       = "ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX",
                 admobInterstitialAdUnitId = "ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX",
+
+                // Optional: App Open ad shown on cold start and foreground resume.
+                // Remove this line (or set null) to disable App Open ads.
+                admobAppOpenAdUnitId      = "ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX",
 
                 analytics    = FirebaseAnalytics.getInstance(this),
                 remoteConfig = Firebase.remoteConfig,
@@ -251,14 +255,17 @@ fun GalleryScreen(viewModel: GalleryViewModel) {
 
 ## 6. MediationConfig parameter reference
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `admobBannerAdUnitId` | `String` | AdMob banner ad unit ID |
-| `admobInterstitialAdUnitId` | `String` | AdMob interstitial ad unit ID |
-| `analytics` | `FirebaseAnalytics` | Host app's Firebase Analytics instance |
-| `remoteConfig` | `FirebaseRemoteConfig` | Host app's Firebase Remote Config instance |
-| `appPackageId` | `String` | Host app package name (tagged on all events) |
-| `theme` | `AdTheme` | Optional brand theming; see [Theming](../smart-ads/theming.md) |
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `admobBannerAdUnitId` | `String` | — | AdMob banner ad unit ID |
+| `admobInterstitialAdUnitId` | `String` | — | AdMob interstitial ad unit ID |
+| `admobAppOpenAdUnitId` | `String?` | `null` | AdMob App Open ad unit ID; `null` disables App Open ads |
+| `analytics` | `FirebaseAnalytics` | — | Host app's Firebase Analytics instance |
+| `remoteConfig` | `FirebaseRemoteConfig` | — | Host app's Firebase Remote Config instance |
+| `appPackageId` | `String` | — | Host app package name (tagged on all events) |
+| `theme` | `AdTheme` | `AdTheme()` | Optional brand theming; see [Theming](../smart-ads/theming.md) |
+
+> **App Open ad unit type.** In the AdMob console you must create an ad unit with format **App open** — banner or interstitial unit IDs are not compatible with this format and will fail silently.
 
 All cadence and timing values are controlled via Firebase Remote Config — see [Remote Config](remote-config.md).
 

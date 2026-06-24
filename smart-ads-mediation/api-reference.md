@@ -1,7 +1,7 @@
 # Smart Ads Mediation SDK — API Reference
 
 **Package:** `io.surendrasp.ads.mediation`  
-**Maven:** `io.surendrasp:ads-sdk-mediation:1.0.0-RC1`
+**Maven:** `io.surendrasp:ads-sdk-mediation:1.0.0-RC2`
 
 ---
 
@@ -75,6 +75,7 @@ Data class holding all configuration for the mediation SDK.
 data class MediationConfig(
     val admobBannerAdUnitId: String,
     val admobInterstitialAdUnitId: String,
+    val admobAppOpenAdUnitId: String? = null,
     val analytics: FirebaseAnalytics,
     val remoteConfig: FirebaseRemoteConfig,
     val appPackageId: String,
@@ -86,6 +87,7 @@ data class MediationConfig(
 |-----------|------|---------|-------------|
 | `admobBannerAdUnitId` | `String` | — | AdMob banner ad unit ID (`ca-app-pub-…/…`) |
 | `admobInterstitialAdUnitId` | `String` | — | AdMob interstitial ad unit ID |
+| `admobAppOpenAdUnitId` | `String?` | `null` | AdMob App Open ad unit ID; `null` disables App Open ads entirely |
 | `analytics` | `FirebaseAnalytics` | — | Firebase Analytics instance from the host app |
 | `remoteConfig` | `FirebaseRemoteConfig` | — | Firebase Remote Config instance from the host app |
 | `appPackageId` | `String` | — | Host app package name — tagged on all analytics events |
@@ -200,8 +202,11 @@ All events are logged to Firebase Analytics. The `appPackageId` field on every e
 
 | Event class | Logged when |
 |-------------|-------------|
-| `AdEvent.Impression` | A banner or interstitial becomes visible |
-| `AdEvent.Click` | The user taps the banner or the house-ad CTA |
+| `AdEvent.Impression` | A banner, interstitial, or App Open ad becomes visible |
+| `AdEvent.Click` | The user taps a banner, interstitial, App Open ad, or house-ad CTA |
 | `AdEvent.Conversion` | The house-ad target app is opened (CTA tapped + navigation succeeded) |
+| `AdEvent.LoadFailed` | An ad fails to load (any format) |
+| `AdEvent.InterstitialShown` | An interstitial is shown (network or house) |
+| `AdEvent.InterstitialDismissed` | An interstitial is dismissed |
 
-The `source` field is `"admob"` for network ads and `"house"` for house ads. The `slot` field is `"banner"` or `"interstitial"`.
+The `source` field is `"admob"` for network ads and `"house"` for house ads. The `slot` field is `"banner"`, `"interstitial"`, `"app_open"`, or `"content"`.
