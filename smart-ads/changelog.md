@@ -1,5 +1,13 @@
 # Smart Ads SDK — Changelog
 
+## Mediation SDK 1.0.0-RC5
+
+### Bug fixes
+
+- **House ads shown for already-installed apps (Android 11+)** — `HouseAdEngine.isInstalled()` in `ads-sdk-kit` used `PackageManager.getPackageInfo()` which silently throws `NameNotFoundException` on API 30+ for packages not declared in `<queries>`, even when installed. The `ads-sdk-kit` manifest now declares a `<queries>` intent filter for `ACTION_MAIN + CATEGORY_LAUNCHER`, covering all launchable apps. No host-app manifest change required — AAR manifests merge automatically.
+
+---
+
 ## 1.0.6-RC3
 
 ### Dependency changes — action required for host apps
